@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+<title>Zé - Organizador Financeiro</title>
+<meta name="theme-color" content="#0b0f1a" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Zé" />
+<link rel="manifest" href="manifest.json" />
+<link rel="apple-touch-icon" href="icon-192.png" />
+<link rel="icon" href="icon-192.png" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-dot"></span>
+    <span class="brand-name">Zé</span>
+  </div>
+  <h1 id="page-title">Finanças</h1>
+</header>
+
+<main id="app">
+
+  <!-- FINANÇAS -->
+  <section class="tab active" id="tab-financas">
+    <div class="balance-card">
+      <div class="balance-label">Saldo total</div>
+      <div class="balance-value" id="saldo-total">R$ 0,00</div>
+      <div class="balance-row">
+        <div class="balance-chip income">
+          <span>Receitas (mês)</span>
+          <strong id="receitas-mes">R$ 0,00</strong>
+        </div>
+        <div class="balance-chip expense">
+          <span>Despesas (mês)</span>
+          <strong id="despesas-mes">R$ 0,00</strong>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head">
+        <h2>Metas de economia</h2>
+        <button class="btn-add" data-action="new-goal">+ Nova</button>
+      </div>
+      <div id="goals-list" class="stack"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-head">
+        <h2>Assinaturas</h2>
+        <button class="btn-add" data-action="new-subscription">+ Nova</button>
+      </div>
+      <div id="subs-list" class="stack"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-head">
+        <h2>Transações</h2>
+      </div>
+      <div id="tx-list" class="stack"></div>
+    </div>
+  </section>
+
+  <!-- LEMBRETES -->
+  <section class="tab" id="tab-lembretes">
+    <div class="section">
+      <div class="section-head">
+        <h2>Pendentes</h2>
+      </div>
+      <div id="tasks-pending" class="stack"></div>
+    </div>
+    <div class="section">
+      <div class="section-head">
+        <h2>Concluídos</h2>
+      </div>
+      <div id="tasks-done" class="stack"></div>
+    </div>
+  </section>
+
+  <!-- DIÁRIO -->
+  <section class="tab" id="tab-diario">
+    <div class="section">
+      <div id="notes-list" class="stack"></div>
+    </div>
+  </section>
+
+  <!-- AJUSTES -->
+  <section class="tab" id="tab-ajustes">
+    <div class="section">
+      <div class="card settings-card">
+        <h2>Seus dados</h2>
+        <p class="muted">Tudo é salvo só neste navegador/celular. Nada é enviado para nenhum servidor.</p>
+        <div class="settings-actions">
+          <button class="btn-secondary" id="btn-export">Exportar backup (.json)</button>
+          <label class="btn-secondary" for="import-file">Importar backup</label>
+          <input type="file" id="import-file" accept="application/json" hidden />
+          <button class="btn-danger" id="btn-clear">Apagar todos os dados</button>
+        </div>
+      </div>
+      <div class="card settings-card">
+        <h2>Sobre</h2>
+        <p class="muted">Zé é o seu organizador financeiro pessoal. Funciona offline, sem cadastro, sem mensalidade.</p>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<button class="fab" id="fab-add">+</button>
+
+<nav class="bottom-nav">
+  <button class="nav-item active" data-tab="financas">
+    <span class="nav-icon">💰</span><span>Finanças</span>
+  </button>
+  <button class="nav-item" data-tab="lembretes">
+    <span class="nav-icon">✅</span><span>Lembretes</span>
+  </button>
+  <button class="nav-item" data-tab="diario">
+    <span class="nav-icon">📓</span><span>Diário</span>
+  </button>
+  <button class="nav-item" data-tab="ajustes">
+    <span class="nav-icon">⚙️</span><span>Ajustes</span>
+  </button>
+</nav>
+
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="modal-title">Título</h3>
+      <button class="modal-close" id="modal-close">✕</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
