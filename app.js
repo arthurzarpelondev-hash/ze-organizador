@@ -35,7 +35,7 @@ function saveData() {
 }
 
 const state = loadData();
-for (const key of ['transactions', 'subscriptions', 'goals', 'tasks', 'notes']) {
+for (const key of ['transactions', 'subscriptions', 'goals', 'tasks', 'notes', 'incomes']) {
   if (!Array.isArray(state[key])) state[key] = [];
 }
 
@@ -66,7 +66,8 @@ function categoryInfo(type, id) {
 
 /* ---------- NAVIGATION ---------- */
 
-const TAB_TITLES = { financas: 'Finanças', lembretes: 'Lembretes', diario: 'Diário', ajustes: 'Ajustes' };
+const TAB_TITLES = { financas: 'Finanças', rapido: 'Rápido', lembretes: 'Lembretes', diario: 'Diário', ajustes: 'Ajustes' };
+const NO_FAB_TABS = ['ajustes', 'rapido'];
 let currentTab = 'financas';
 
 function switchTab(tab) {
@@ -75,7 +76,7 @@ function switchTab(tab) {
   document.getElementById('tab-' + tab).classList.add('active');
   document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.tab === tab));
   document.getElementById('page-title').textContent = TAB_TITLES[tab];
-  document.getElementById('fab-add').style.display = tab === 'ajustes' ? 'none' : 'flex';
+  document.getElementById('fab-add').style.display = NO_FAB_TABS.includes(tab) ? 'none' : 'flex';
 }
 
 document.querySelectorAll('.nav-item').forEach(btn => {
@@ -123,6 +124,7 @@ function renderFinancas() {
   document.getElementById('despesas-mes').textContent = brl(despesasMes);
 
   renderGoals();
+  renderIncomes();
   renderSubscriptions();
   renderTransactions();
 }
@@ -148,6 +150,82 @@ function renderGoals() {
       </div>
     </div>`;
   }).join('');
+}
+
+function renderIncomes() {
+  const el = document.getElementById('income-list');
+  if (!state.incomes.length) {
+    el.innerHTML = '<div class="empty-hint">Nenhuma renda fixa cadastrada. Cadastre seu salário pra ele ser lançado sozinho todo mês.</div>';
+    return;
+  }
+  const nowMonth = todayISO().slice(0, 7);
+  el.innerHTML = state.incomes.map(inc => {
+    const launched = inc.lastLaunchedMonth === nowMonth;
+    return `
+    <div class="card sub-card-wrap">
+      <div class="sub-card">
+        <div>
+          <div class="sub-name">${escapeHTML(inc.name)}</div>
+          <div class="sub-due">Todo dia ${inc.payDay} · ${launched ? 'já lançado este mês' : 'ainda não lançado este mês'}</div>
+        </div>
+        <div class="sub-amount">${brl(inc.amount)}</div>
+      </div>
+      <div class="sub-actions">
+        ${launched ? '' : `<button class="link-btn" data-action="income-launch" data-id="${inc.id}">Lançar agora</button>`}
+        <button class="link-btn danger" data-action="income-del" data-id="${inc.id}">Excluir</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function launchIncome(inc) {
+  state.transactions.push({
+    id: uid(), type: 'income', desc: inc.name, category: 'salario',
+    amount: inc.amount, date: todayISO(), createdAt: Date.now(),
+  });
+  inc.lastLaunchedMonth = todayISO().slice(0, 7);
+}
+
+function autoLaunchIncomes() {
+  const nowMonth = todayISO().slice(0, 7);
+  const now = new Date();
+  let changed = false;
+  for (const inc of state.incomes) {
+    if (inc.lastLaunchedMonth === nowMonth) continue;
+    if (now.getDate() >= inc.payDay) {
+      launchIncome(inc);
+      changed = true;
+    }
+  }
+  if (changed) saveData();
+}
+
+function openIncomeModal() {
+  openModal('Nova renda fixa', `
+    <div class="field">
+      <label>Nome</label>
+      <input type="text" id="income-name" placeholder="Ex: Salário CLT, Salário empresa..." />
+    </div>
+    <div class="field">
+      <label>Valor (R$)</label>
+      <input type="number" id="income-amount" inputmode="decimal" step="0.01" min="0" placeholder="0,00" />
+    </div>
+    <div class="field">
+      <label>Dia do mês que cai o pagamento</label>
+      <input type="number" id="income-day" min="1" max="31" value="5" />
+    </div>
+    <button class="btn-submit" id="income-submit">Salvar</button>
+  `);
+  document.getElementById('income-submit').addEventListener('click', () => {
+    const name = document.getElementById('income-name').value.trim();
+    const amount = parseFloat(document.getElementById('income-amount').value);
+    const payDay = Math.min(31, Math.max(1, parseInt(document.getElementById('income-day').value) || 1));
+    if (!name || !amount || amount <= 0) { alert('Preencha nome e valor.'); return; }
+    state.incomes.push({ id: uid(), name, amount, payDay, lastLaunchedMonth: null });
+    saveData();
+    renderIncomes();
+    closeModal();
+  });
 }
 
 function nextDueDate(dueDay) {
@@ -445,6 +523,229 @@ function openNoteModal() {
   });
 }
 
+/* ---------- RÁPIDO: texto, voz, comprovante ---------- */
+
+const QUICK_EXPENSE_VERBS = ['gastei', 'paguei', 'comprei', 'gasto'];
+const QUICK_INCOME_VERBS = ['recebi', 'ganhei', 'caiu', 'entrou'];
+
+const CATEGORY_KEYWORDS = {
+  alimentacao: ['mercado', 'supermercado', 'feira', 'restaurante', 'lanche', 'ifood', 'comida', 'padaria', 'acougue'],
+  transporte: ['uber', '99', 'gasolina', 'combustivel', 'onibus', 'metro', 'estacionamento', 'pedagio'],
+  moradia: ['aluguel', 'condominio', 'luz', 'agua', 'internet', 'gas'],
+  lazer: ['cinema', 'bar', 'festa', 'show', 'viagem', 'passeio', 'jogo'],
+  saude: ['farmacia', 'remedio', 'medico', 'consulta', 'dentista'],
+  educacao: ['curso', 'livro', 'faculdade', 'escola', 'mensalidade'],
+  assinaturas: ['netflix', 'spotify', 'amazon', 'academia', 'assinatura'],
+};
+const INCOME_CATEGORY_KEYWORDS = {
+  salario: ['salario'],
+  freela: ['freela', 'freelance', 'bico'],
+  investimento: ['investimento', 'dividendo', 'rendimento'],
+};
+
+function stripAccents(str) {
+  return str.normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
+function parseQuickEntry(rawText) {
+  const text = (rawText || '').trim();
+  if (!text) return null;
+  const norm = stripAccents(text.toLowerCase());
+
+  let type = 'expense';
+  if (QUICK_INCOME_VERBS.some(v => norm.includes(v))) type = 'income';
+  else if (QUICK_EXPENSE_VERBS.some(v => norm.includes(v))) type = 'expense';
+
+  const amountMatch = norm.match(/(\d+(?:[.,]\d{1,2})?)/);
+  if (!amountMatch) return null;
+  const amount = parseFloat(amountMatch[1].replace(',', '.'));
+  if (!amount || amount <= 0) return null;
+
+  const keywordMap = type === 'income' ? INCOME_CATEGORY_KEYWORDS : CATEGORY_KEYWORDS;
+  let category = type === 'income' ? 'outros_receita' : 'outros_despesa';
+  for (const [cat, words] of Object.entries(keywordMap)) {
+    if (words.some(w => norm.includes(w))) { category = cat; break; }
+  }
+
+  return { type, amount, category, desc: text };
+}
+
+function renderQuickRecent() {
+  const el = document.getElementById('quick-recent');
+  const list = state.transactions.filter(t => t.quick).sort((a, b) => b.createdAt - a.createdAt).slice(0, 5);
+  if (!list.length) {
+    el.innerHTML = '<div class="empty-hint">Nada lançado por aqui ainda.</div>';
+    return;
+  }
+  el.innerHTML = list.map(tx => {
+    const cat = categoryInfo(tx.type, tx.category);
+    const sign = tx.type === 'income' ? '+' : '-';
+    return `
+    <div class="card tx-row">
+      <div class="tx-icon">${cat.icon}</div>
+      <div class="tx-info">
+        <div class="tx-desc">${escapeHTML(tx.desc || cat.label)}</div>
+        <div class="tx-meta">${cat.label} · ${formatDateBR(tx.date)}</div>
+      </div>
+      <div class="tx-amount ${tx.type}">${sign} ${brl(tx.amount)}</div>
+      <button class="tx-del" data-action="tx-del" data-id="${tx.id}">🗑</button>
+    </div>`;
+  }).join('');
+}
+
+function handleQuickSubmit() {
+  const input = document.getElementById('quick-text');
+  const parsed = parseQuickEntry(input.value);
+  const feedbackEl = document.getElementById('quick-feedback');
+  if (!parsed) {
+    feedbackEl.innerHTML = `<div class="quick-feedback-card error">Não entendi o valor. Tente algo como "gastei 25 no mercado" ou "recebi 3000 de salário".</div>`;
+    return;
+  }
+  const tx = {
+    id: uid(), type: parsed.type, desc: parsed.desc, category: parsed.category,
+    amount: parsed.amount, date: todayISO(), createdAt: Date.now(), quick: true,
+  };
+  state.transactions.push(tx);
+  saveData();
+  renderFinancas();
+  renderQuickRecent();
+  const cat = categoryInfo(parsed.type, parsed.category);
+  const label = parsed.type === 'income' ? 'Receita' : 'Despesa';
+  feedbackEl.innerHTML = `
+    <div class="quick-feedback-card">
+      ✅ ${label} de ${brl(parsed.amount)} em ${cat.label} adicionada.
+      <div class="qf-actions">
+        <button class="link-btn danger" data-action="quick-undo" data-id="${tx.id}">Desfazer</button>
+      </div>
+    </div>`;
+  input.value = '';
+}
+
+document.getElementById('quick-submit').addEventListener('click', handleQuickSubmit);
+document.getElementById('quick-text').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); handleQuickSubmit(); }
+});
+
+/* Voz: só aparece se o navegador suportar (ex: Chrome Android). iOS Safari não suporta. */
+const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+if (SpeechRec) {
+  const recognition = new SpeechRec();
+  recognition.lang = 'pt-BR';
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+  const micBtn = document.getElementById('quick-mic');
+  micBtn.hidden = false;
+  let listening = false;
+
+  micBtn.addEventListener('click', () => {
+    if (listening) { recognition.stop(); return; }
+    recognition.start();
+  });
+  recognition.addEventListener('start', () => { listening = true; micBtn.classList.add('listening'); });
+  recognition.addEventListener('end', () => { listening = false; micBtn.classList.remove('listening'); });
+  recognition.addEventListener('result', (e) => {
+    const text = e.results[0][0].transcript;
+    document.getElementById('quick-text').value = text;
+    handleQuickSubmit();
+  });
+  recognition.addEventListener('error', () => { listening = false; micBtn.classList.remove('listening'); });
+}
+
+/* Comprovante: OCR local via Tesseract.js (grátis, roda no navegador, sem chave de API) */
+let tesseractLoadPromise = null;
+function loadTesseract() {
+  if (window.Tesseract) return Promise.resolve();
+  if (tesseractLoadPromise) return tesseractLoadPromise;
+  tesseractLoadPromise = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+    s.onload = resolve;
+    s.onerror = () => reject(new Error('Falha ao carregar leitor de imagem.'));
+    document.head.appendChild(s);
+  });
+  return tesseractLoadPromise;
+}
+
+function extractAmountFromText(text) {
+  const lower = text.toLowerCase();
+  const lines = lower.split('\n');
+  const amountRegex = /\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})?/g;
+  function parseNum(str) {
+    const s = str.replace(/\.(?=\d{3})/g, '').replace(',', '.');
+    const n = parseFloat(s);
+    return isNaN(n) ? null : n;
+  }
+  const candidates = [];
+  for (const line of lines) {
+    const matches = line.match(amountRegex);
+    if (!matches) continue;
+    for (const m of matches) {
+      const n = parseNum(m);
+      if (n && n > 0 && n < 1000000) candidates.push({ n, isTotal: line.includes('total') });
+    }
+  }
+  if (!candidates.length) return null;
+  const totals = candidates.filter(c => c.isTotal);
+  const pool = totals.length ? totals : candidates;
+  return Math.max(...pool.map(c => c.n));
+}
+
+function showReceiptConfirm(amount) {
+  const el = document.getElementById('receipt-confirm');
+  el.innerHTML = `
+    <div class="field">
+      <label>Descrição</label>
+      <input type="text" id="receipt-desc" value="Comprovante" />
+    </div>
+    <div class="field">
+      <label>Valor (R$)</label>
+      <input type="number" id="receipt-amount" inputmode="decimal" step="0.01" min="0" value="${amount ? amount.toFixed(2) : ''}" />
+    </div>
+    <div class="field">
+      <label>Categoria</label>
+      <select id="receipt-category">${categoryOptions('expense')}</select>
+    </div>
+    <button class="btn-submit" id="receipt-save">Salvar despesa</button>
+  `;
+  document.getElementById('receipt-save').addEventListener('click', () => {
+    const desc = document.getElementById('receipt-desc').value.trim() || 'Comprovante';
+    const amt = parseFloat(document.getElementById('receipt-amount').value);
+    const category = document.getElementById('receipt-category').value;
+    if (!amt || amt <= 0) { alert('Informe um valor válido.'); return; }
+    state.transactions.push({
+      id: uid(), type: 'expense', desc, category, amount: amt,
+      date: todayISO(), createdAt: Date.now(), quick: true,
+    });
+    saveData();
+    renderFinancas();
+    renderQuickRecent();
+    el.innerHTML = '';
+    document.getElementById('receipt-status').textContent = '✅ Despesa salva!';
+  });
+}
+
+document.getElementById('receipt-file').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const statusEl = document.getElementById('receipt-status');
+  document.getElementById('receipt-confirm').innerHTML = '';
+  statusEl.textContent = 'Carregando leitor de imagem...';
+  try {
+    await loadTesseract();
+    statusEl.textContent = '📖 Lendo comprovante, pode levar alguns segundos...';
+    const { data } = await Tesseract.recognize(file, 'por');
+    const amount = extractAmountFromText(data.text || '');
+    statusEl.textContent = amount
+      ? `Valor encontrado: ${brl(amount)}. Confira e salve abaixo.`
+      : 'Não consegui identificar o valor automaticamente. Preencha manualmente abaixo.';
+    showReceiptConfirm(amount);
+  } catch (err) {
+    statusEl.textContent = 'Não consegui ler a imagem (verifique sua internet). Preencha manualmente abaixo.';
+    showReceiptConfirm(null);
+  }
+  e.target.value = '';
+});
+
 /* ---------- CLICK DELEGATION ---------- */
 
 document.addEventListener('click', (e) => {
@@ -460,6 +761,18 @@ document.addEventListener('click', (e) => {
       if (confirm('Excluir esta meta?')) {
         state.goals = state.goals.filter(g => g.id !== id);
         saveData(); renderGoals();
+      }
+      break;
+    case 'new-income': openIncomeModal(); break;
+    case 'income-launch': {
+      const inc = state.incomes.find(i => i.id === id);
+      if (inc) { launchIncome(inc); saveData(); renderFinancas(); }
+      break;
+    }
+    case 'income-del':
+      if (confirm('Excluir esta renda fixa?')) {
+        state.incomes = state.incomes.filter(i => i.id !== id);
+        saveData(); renderIncomes();
       }
       break;
     case 'new-subscription': openSubscriptionModal(); break;
@@ -484,7 +797,12 @@ document.addEventListener('click', (e) => {
     }
     case 'tx-del':
       state.transactions = state.transactions.filter(t => t.id !== id);
-      saveData(); renderFinancas();
+      saveData(); renderFinancas(); renderQuickRecent();
+      break;
+    case 'quick-undo':
+      state.transactions = state.transactions.filter(t => t.id !== id);
+      saveData(); renderFinancas(); renderQuickRecent();
+      document.getElementById('quick-feedback').innerHTML = '';
       break;
     case 'task-toggle': {
       const task = state.tasks.find(t => t.id === id);
@@ -530,7 +848,7 @@ document.getElementById('import-file').addEventListener('change', (e) => {
     try {
       const data = JSON.parse(reader.result);
       if (!confirm('Importar este backup vai substituir todos os dados atuais. Continuar?')) return;
-      for (const key of ['transactions', 'subscriptions', 'goals', 'tasks', 'notes']) {
+      for (const key of ['transactions', 'subscriptions', 'goals', 'tasks', 'notes', 'incomes']) {
         state[key] = Array.isArray(data[key]) ? data[key] : [];
       }
       saveData();
@@ -559,8 +877,10 @@ function renderAll() {
   renderFinancas();
   renderTasks();
   renderNotes();
+  renderQuickRecent();
 }
 
+autoLaunchIncomes();
 renderAll();
 switchTab('financas');
 

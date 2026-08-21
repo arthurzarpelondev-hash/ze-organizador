@@ -53,6 +53,14 @@
 
     <div class="section">
       <div class="section-head">
+        <h2>Renda fixa</h2>
+        <button class="btn-add" data-action="new-income">+ Nova</button>
+      </div>
+      <div id="income-list" class="stack"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-head">
         <h2>Assinaturas</h2>
         <button class="btn-add" data-action="new-subscription">+ Nova</button>
       </div>
@@ -64,6 +72,34 @@
         <h2>Transações</h2>
       </div>
       <div id="tx-list" class="stack"></div>
+    </div>
+  </section>
+
+  <!-- RÁPIDO -->
+  <section class="tab" id="tab-rapido">
+    <div class="card quick-card">
+      <h2>Fale ou digite</h2>
+      <p class="muted">Ex: "gastei 25 no mercado" ou "recebi 3000 de salário"</p>
+      <div class="quick-input-row">
+        <input type="text" id="quick-text" placeholder="gastei 25 no mercado..." />
+        <button class="quick-mic" id="quick-mic" hidden title="Falar">🎤</button>
+      </div>
+      <button class="btn-submit" id="quick-submit">Adicionar</button>
+      <div id="quick-feedback"></div>
+    </div>
+
+    <div class="card quick-card">
+      <h2>Enviar comprovante</h2>
+      <p class="muted">Tiramos o valor da foto automaticamente (leitura local, sem enviar pra nenhum servidor).</p>
+      <label class="btn-secondary" for="receipt-file">📷 Escolher / tirar foto</label>
+      <input type="file" id="receipt-file" accept="image/*" capture="environment" hidden />
+      <div id="receipt-status" class="muted"></div>
+      <div id="receipt-confirm"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-head"><h2>Últimos lançamentos rápidos</h2></div>
+      <div id="quick-recent" class="stack"></div>
     </div>
   </section>
 
@@ -117,6 +153,9 @@
 <nav class="bottom-nav">
   <button class="nav-item active" data-tab="financas">
     <span class="nav-icon">💰</span><span>Finanças</span>
+  </button>
+  <button class="nav-item" data-tab="rapido">
+    <span class="nav-icon">⚡</span><span>Rápido</span>
   </button>
   <button class="nav-item" data-tab="lembretes">
     <span class="nav-icon">✅</span><span>Lembretes</span>

@@ -417,3 +417,59 @@ body {
   font-weight: 700;
   margin-top: 6px;
 }
+
+/* Quick entry tab */
+.quick-card { margin-bottom: 16px; }
+.quick-card h2 { font-size: 16px; margin: 0 0 4px; }
+.quick-card .muted { margin: 0 0 12px; }
+.quick-card .btn-secondary { display: block; text-align: center; margin-bottom: 8px; }
+
+.quick-input-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.quick-input-row input {
+  flex: 1;
+  background: var(--bg-card-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  color: var(--text);
+  font-size: 15px;
+}
+.quick-mic {
+  width: 46px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-card-2);
+  font-size: 18px;
+  flex-shrink: 0;
+}
+.quick-mic.listening {
+  background: rgba(248,113,113,0.15);
+  border-color: var(--red);
+  animation: pulse 1s infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.quick-feedback-card {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(34,211,174,0.1);
+  border: 1px solid rgba(34,211,174,0.3);
+  font-size: 13px;
+}
+.quick-feedback-card.error {
+  background: rgba(248,113,113,0.1);
+  border-color: rgba(248,113,113,0.35);
+}
+.quick-feedback-card .qf-actions { display: flex; gap: 14px; margin-top: 8px; }
+
+#receipt-status { margin-top: 6px; }
+#receipt-confirm .field { margin-top: 12px; }
+
