@@ -84,7 +84,7 @@ async function checkAndNotify(env) {
 
     try {
       const body = `${greetingBR(new Date())} Arthur, está na hora de ${r.title}`;
-      await sendPush(env, subscription, { title: '⚡ Zé', body, id: r.id });
+      await sendPush(env, subscription, { title: 'Zé', body, id: r.id });
       sent++;
     } catch (err) {
       console.error('push failed', err);
