@@ -40,6 +40,9 @@ body {
 .install-banner[hidden] {
   display: none;
 }
+.notify-banner {
+  background: linear-gradient(135deg, #6b4a0c, var(--bg-card));
+}
 .install-banner-text {
   font-size: 13px;
   font-weight: 600;

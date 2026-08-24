@@ -1330,6 +1330,8 @@ document.getElementById('btn-clear').addEventListener('click', () => {
 
 const VAPID_PUBLIC_KEY = 'BOT9UN52kNVeOs2DwTEdZQTYRydt8k5W7MUgBLddtiD3sIHhUYET9sKoONTzQbUZwBOxUTbW6YP92nwJ43vrKnI';
 const NOTIF_CONFIG_KEY = 'ze_notif_config_v1';
+const DEFAULT_WORKER_URL = 'https://ze-push.zefinancas.workers.dev';
+const DEFAULT_SECRET = 'ZEPUSH';
 
 function loadNotifConfig() {
   try {
@@ -1375,10 +1377,12 @@ async function syncReminders() {
 }
 
 async function enableNotifications() {
-  const cfg = loadNotifConfig();
+  let cfg = loadNotifConfig();
   if (!cfg.workerUrl || !cfg.secret) {
-    setNotifStatus('Preencha e salve o endereço do servidor e a chave secreta antes.');
-    return;
+    cfg = { workerUrl: DEFAULT_WORKER_URL, secret: DEFAULT_SECRET };
+    saveNotifConfig(cfg);
+    document.getElementById('notif-worker-url').value = cfg.workerUrl;
+    document.getElementById('notif-secret').value = cfg.secret;
   }
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
     setNotifStatus('Esse navegador não suporta notificações push.');
@@ -1419,6 +1423,29 @@ document.getElementById('btn-save-notif-config').addEventListener('click', () =>
 });
 
 document.getElementById('btn-enable-notif').addEventListener('click', enableNotifications);
+
+const NOTIFY_BANNER_DISMISS_KEY = 'ze_notify_banner_dismissed_v1';
+
+function showNotifyBanner() {
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'granted') return;
+  if (localStorage.getItem(NOTIFY_BANNER_DISMISS_KEY)) return;
+  document.getElementById('notify-banner').hidden = false;
+}
+
+function hideNotifyBanner() {
+  document.getElementById('notify-banner').hidden = true;
+}
+
+document.getElementById('notify-banner-dismiss').addEventListener('click', () => {
+  hideNotifyBanner();
+  localStorage.setItem(NOTIFY_BANNER_DISMISS_KEY, '1');
+});
+
+document.getElementById('btn-notify-banner').addEventListener('click', async () => {
+  await enableNotifications();
+  hideNotifyBanner();
+});
 
 /* ---------- ADICIONAR À TELA DE INÍCIO ---------- */
 
@@ -1497,8 +1524,9 @@ renderAll();
 switchTab('financas');
 
 const savedNotifConfig = loadNotifConfig();
-document.getElementById('notif-worker-url').value = savedNotifConfig.workerUrl || '';
-document.getElementById('notif-secret').value = savedNotifConfig.secret || '';
+document.getElementById('notif-worker-url').value = savedNotifConfig.workerUrl || DEFAULT_WORKER_URL;
+document.getElementById('notif-secret').value = savedNotifConfig.secret || DEFAULT_SECRET;
+showNotifyBanner();
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
