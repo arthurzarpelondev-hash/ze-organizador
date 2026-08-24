@@ -966,6 +966,68 @@ document.getElementById('btn-save-notif-config').addEventListener('click', () =>
 
 document.getElementById('btn-enable-notif').addEventListener('click', enableNotifications);
 
+/* ---------- ADICIONAR À TELA DE INÍCIO ---------- */
+
+const INSTALL_DISMISS_KEY = 'ze_install_dismissed_v1';
+let deferredInstallPrompt = null;
+
+function isStandaloneApp() {
+  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+}
+
+function isIOSDevice() {
+  return /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+function showInstallBanner() {
+  if (isStandaloneApp()) return;
+  if (localStorage.getItem(INSTALL_DISMISS_KEY)) return;
+  document.getElementById('install-banner').hidden = false;
+}
+
+function hideInstallBanner() {
+  document.getElementById('install-banner').hidden = true;
+}
+
+async function triggerInstall() {
+  if (deferredInstallPrompt) {
+    deferredInstallPrompt.prompt();
+    const { outcome } = await deferredInstallPrompt.userChoice;
+    deferredInstallPrompt = null;
+    if (outcome === 'accepted') hideInstallBanner();
+    return;
+  }
+  if (isIOSDevice()) {
+    openModal('Adicionar à tela de início', `
+      <p class="muted">No Safari, toque no ícone de compartilhar <strong>⬆️</strong> (barra de baixo, ou de cima no iPad) e depois em <strong>"Adicionar à Tela de Início"</strong>.</p>
+    `);
+    return;
+  }
+  openModal('Adicionar à tela de início', `
+    <p class="muted">Abra o menu do seu navegador (⋮ ou •••) e procure a opção <strong>"Instalar app"</strong> ou <strong>"Adicionar à tela inicial"</strong>.</p>
+  `);
+}
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  showInstallBanner();
+});
+
+window.addEventListener('appinstalled', hideInstallBanner);
+
+document.getElementById('btn-install').addEventListener('click', triggerInstall);
+document.getElementById('btn-install-settings').addEventListener('click', triggerInstall);
+document.getElementById('install-dismiss').addEventListener('click', () => {
+  hideInstallBanner();
+  localStorage.setItem(INSTALL_DISMISS_KEY, '1');
+});
+
+if (isIOSDevice() && !isStandaloneApp() && !localStorage.getItem(INSTALL_DISMISS_KEY)) {
+  showInstallBanner();
+}
+
 /* ---------- INIT ---------- */
 
 function renderAll() {

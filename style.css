@@ -28,6 +28,43 @@ body {
   padding-bottom: calc(72px + env(safe-area-inset-bottom));
 }
 
+.install-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: space-between;
+  background: linear-gradient(135deg, var(--teal-dark), var(--bg-card));
+  border-bottom: 1px solid var(--border);
+  padding: calc(10px + env(safe-area-inset-top)) 16px 10px;
+}
+.install-banner-text {
+  font-size: 13px;
+  font-weight: 600;
+  flex: 1;
+}
+.install-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.btn-install {
+  background: var(--teal);
+  color: #04241d;
+  border: none;
+  border-radius: 20px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.install-close {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 14px;
+  padding: 4px 6px;
+}
+
 .topbar {
   position: sticky;
   top: 0;
