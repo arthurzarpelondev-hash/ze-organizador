@@ -37,6 +37,9 @@ body {
   border-bottom: 1px solid var(--border);
   padding: calc(10px + env(safe-area-inset-top)) 16px 10px;
 }
+.install-banner[hidden] {
+  display: none;
+}
 .install-banner-text {
   font-size: 13px;
   font-weight: 600;

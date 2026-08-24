@@ -47,7 +47,10 @@ function loadData() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) return JSON.parse(raw);
   } catch (e) { console.warn('Falha ao ler dados salvos', e); }
-  return { transactions: [], subscriptions: [], goals: [], tasks: [], notes: [], bizTransactions: [], bizGoals: [] };
+  return {
+    transactions: [], subscriptions: [], goals: [], tasks: [], notes: [],
+    bizTransactions: [], bizGoals: [], bizPayables: [], bizReceivables: [],
+  };
 }
 
 function saveData() {
@@ -55,7 +58,10 @@ function saveData() {
 }
 
 const state = loadData();
-for (const key of ['transactions', 'subscriptions', 'goals', 'tasks', 'notes', 'incomes', 'bizTransactions', 'bizGoals']) {
+for (const key of [
+  'transactions', 'subscriptions', 'goals', 'tasks', 'notes', 'incomes',
+  'bizTransactions', 'bizGoals', 'bizPayables', 'bizReceivables',
+]) {
   if (!Array.isArray(state[key])) state[key] = [];
 }
 
@@ -532,6 +538,8 @@ function renderNegocio() {
   document.getElementById('biz-despesas-mes').textContent = brl(despesasMes);
 
   renderBizGoals();
+  renderBizPayables();
+  renderBizReceivables();
   renderBizTransactions();
 }
 
@@ -578,6 +586,60 @@ function renderBizTransactions() {
       </div>
       <div class="tx-amount ${tx.type}">${sign} ${brl(tx.amount)}</div>
       <button class="tx-del" data-action="biz-tx-del" data-id="${tx.id}">🗑</button>
+    </div>`;
+  }).join('');
+}
+
+function renderBizPayables() {
+  const el = document.getElementById('biz-payables-list');
+  const list = [...state.bizPayables].sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''));
+  if (!list.length) {
+    el.innerHTML = '<div class="empty-hint">Nenhuma conta a pagar pendente.</div>';
+    return;
+  }
+  const today = todayISO();
+  el.innerHTML = list.map(p => {
+    const overdue = p.dueDate && p.dueDate < today;
+    return `
+    <div class="card sub-card-wrap">
+      <div class="sub-card">
+        <div>
+          <div class="sub-name">${escapeHTML(p.desc)}</div>
+          <div class="sub-due ${overdue ? 'soon' : ''}">Vence em ${formatDateBR(p.dueDate)}${overdue ? ' · atrasada' : ''}</div>
+        </div>
+        <div class="sub-amount">${brl(p.amount)}</div>
+      </div>
+      <div class="sub-actions">
+        <button class="link-btn" data-action="biz-payable-pay" data-id="${p.id}">Marcar como paga</button>
+        <button class="link-btn danger" data-action="biz-payable-del" data-id="${p.id}">Excluir</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderBizReceivables() {
+  const el = document.getElementById('biz-receivables-list');
+  const list = [...state.bizReceivables].sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''));
+  if (!list.length) {
+    el.innerHTML = '<div class="empty-hint">Nenhuma conta a receber pendente.</div>';
+    return;
+  }
+  const today = todayISO();
+  el.innerHTML = list.map(r => {
+    const overdue = r.dueDate && r.dueDate < today;
+    return `
+    <div class="card sub-card-wrap">
+      <div class="sub-card">
+        <div>
+          <div class="sub-name">${escapeHTML(r.desc)}</div>
+          <div class="sub-due ${overdue ? 'soon' : ''}">Previsto para ${formatDateBR(r.dueDate)}${overdue ? ' · atrasada' : ''}</div>
+        </div>
+        <div class="sub-amount">${brl(r.amount)}</div>
+      </div>
+      <div class="sub-actions">
+        <button class="link-btn" data-action="biz-receivable-receive" data-id="${r.id}">Marcar como recebida</button>
+        <button class="link-btn danger" data-action="biz-receivable-del" data-id="${r.id}">Excluir</button>
+      </div>
     </div>`;
   }).join('');
 }
@@ -690,6 +752,72 @@ function openBizGoalAddModal(goalId) {
     goal.saved = (goal.saved || 0) + amount;
     saveData();
     renderBizGoals();
+    closeModal();
+  });
+}
+
+function openBizPayableModal() {
+  openModal('Nova conta a pagar', `
+    <div class="field">
+      <label>Descrição</label>
+      <input type="text" id="biz-payable-desc" placeholder="Ex: Fornecedor de embalagens, Aluguel do galpão..." />
+    </div>
+    <div class="field">
+      <label>Valor (R$)</label>
+      <input type="number" id="biz-payable-amount" inputmode="decimal" step="0.01" min="0" placeholder="0,00" />
+    </div>
+    <div class="field">
+      <label>Categoria</label>
+      <select id="biz-payable-category">${bizCategoryOptions('expense')}</select>
+    </div>
+    <div class="field">
+      <label>Vencimento</label>
+      <input type="date" id="biz-payable-due" value="${todayISO()}" />
+    </div>
+    <button class="btn-submit" id="biz-payable-submit">Salvar</button>
+  `);
+  document.getElementById('biz-payable-submit').addEventListener('click', () => {
+    const desc = document.getElementById('biz-payable-desc').value.trim();
+    const amount = parseFloat(document.getElementById('biz-payable-amount').value);
+    const category = document.getElementById('biz-payable-category').value;
+    const dueDate = document.getElementById('biz-payable-due').value || todayISO();
+    if (!desc || !amount || amount <= 0) { alert('Preencha descrição e valor.'); return; }
+    state.bizPayables.push({ id: uid(), desc, amount, category, dueDate });
+    saveData();
+    renderBizPayables();
+    closeModal();
+  });
+}
+
+function openBizReceivableModal() {
+  openModal('Nova conta a receber', `
+    <div class="field">
+      <label>Descrição</label>
+      <input type="text" id="biz-receivable-desc" placeholder="Ex: Cliente Y, Parcela do projeto Z..." />
+    </div>
+    <div class="field">
+      <label>Valor (R$)</label>
+      <input type="number" id="biz-receivable-amount" inputmode="decimal" step="0.01" min="0" placeholder="0,00" />
+    </div>
+    <div class="field">
+      <label>Categoria</label>
+      <select id="biz-receivable-category">${bizCategoryOptions('income')}</select>
+    </div>
+    <div class="field">
+      <label>Previsão de recebimento</label>
+      <input type="date" id="biz-receivable-due" value="${todayISO()}" />
+    </div>
+    <button class="btn-submit" id="biz-receivable-submit">Salvar</button>
+  `);
+  document.getElementById('biz-receivable-submit').addEventListener('click', () => {
+    const desc = document.getElementById('biz-receivable-desc').value.trim();
+    const amount = parseFloat(document.getElementById('biz-receivable-amount').value);
+    const category = document.getElementById('biz-receivable-category').value;
+    const dueDate = document.getElementById('biz-receivable-due').value || todayISO();
+    if (!desc || !amount || amount <= 0) { alert('Preencha descrição e valor.'); return; }
+    state.bizReceivables.push({ id: uid(), desc, amount, category, dueDate });
+    saveData();
+    renderBizReceivables();
     closeModal();
   });
 }
@@ -1102,6 +1230,46 @@ document.addEventListener('click', (e) => {
       state.bizTransactions = state.bizTransactions.filter(t => t.id !== id);
       saveData(); renderNegocio();
       break;
+    case 'new-biz-payable': openBizPayableModal(); break;
+    case 'biz-payable-pay': {
+      const payable = state.bizPayables.find(p => p.id === id);
+      if (payable) {
+        state.bizTransactions.push({
+          id: uid(), type: 'expense', desc: payable.desc, category: payable.category,
+          amount: payable.amount, date: todayISO(), createdAt: Date.now(),
+        });
+        state.bizPayables = state.bizPayables.filter(p => p.id !== id);
+        saveData();
+        renderNegocio();
+      }
+      break;
+    }
+    case 'biz-payable-del':
+      if (confirm('Excluir esta conta a pagar?')) {
+        state.bizPayables = state.bizPayables.filter(p => p.id !== id);
+        saveData(); renderBizPayables();
+      }
+      break;
+    case 'new-biz-receivable': openBizReceivableModal(); break;
+    case 'biz-receivable-receive': {
+      const receivable = state.bizReceivables.find(r => r.id === id);
+      if (receivable) {
+        state.bizTransactions.push({
+          id: uid(), type: 'income', desc: receivable.desc, category: receivable.category,
+          amount: receivable.amount, date: todayISO(), createdAt: Date.now(),
+        });
+        state.bizReceivables = state.bizReceivables.filter(r => r.id !== id);
+        saveData();
+        renderNegocio();
+      }
+      break;
+    }
+    case 'biz-receivable-del':
+      if (confirm('Excluir esta conta a receber?')) {
+        state.bizReceivables = state.bizReceivables.filter(r => r.id !== id);
+        saveData(); renderBizReceivables();
+      }
+      break;
   }
 });
 
@@ -1132,7 +1300,10 @@ document.getElementById('import-file').addEventListener('change', (e) => {
     try {
       const data = JSON.parse(reader.result);
       if (!confirm('Importar este backup vai substituir todos os dados atuais. Continuar?')) return;
-      for (const key of ['transactions', 'subscriptions', 'goals', 'tasks', 'notes', 'incomes', 'bizTransactions', 'bizGoals']) {
+      for (const key of [
+        'transactions', 'subscriptions', 'goals', 'tasks', 'notes', 'incomes',
+        'bizTransactions', 'bizGoals', 'bizPayables', 'bizReceivables',
+      ]) {
         state[key] = Array.isArray(data[key]) ? data[key] : [];
       }
       saveData();
