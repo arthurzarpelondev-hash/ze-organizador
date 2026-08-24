@@ -83,6 +83,58 @@
     </div>
   </section>
 
+  <!-- GASTOS (RELATÓRIO) -->
+  <section class="tab" id="tab-relatorio">
+    <div class="card report-month-card">
+      <button class="month-nav" id="report-prev">‹</button>
+      <div class="report-month-label" id="report-month-label">—</div>
+      <button class="month-nav" id="report-next">›</button>
+    </div>
+    <div class="balance-card report-total-card">
+      <div class="balance-label">Total gasto no mês</div>
+      <div class="balance-value" id="report-total">R$ 0,00</div>
+    </div>
+    <div class="section">
+      <div class="section-head">
+        <h2>Por categoria</h2>
+      </div>
+      <div id="report-categories" class="stack"></div>
+    </div>
+  </section>
+
+  <!-- NEGÓCIO -->
+  <section class="tab" id="tab-negocio">
+    <div class="balance-card">
+      <div class="balance-label">Saldo do negócio</div>
+      <div class="balance-value" id="biz-saldo-total">R$ 0,00</div>
+      <div class="balance-row">
+        <div class="balance-chip income">
+          <span>Receitas (mês)</span>
+          <strong id="biz-receitas-mes">R$ 0,00</strong>
+        </div>
+        <div class="balance-chip expense">
+          <span>Despesas (mês)</span>
+          <strong id="biz-despesas-mes">R$ 0,00</strong>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head">
+        <h2>Metas & projetos</h2>
+        <button class="btn-add" data-action="new-biz-goal">+ Nova</button>
+      </div>
+      <div id="biz-goals-list" class="stack"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-head">
+        <h2>Lançamentos</h2>
+      </div>
+      <div id="biz-tx-list" class="stack"></div>
+    </div>
+  </section>
+
   <!-- RÁPIDO -->
   <section class="tab" id="tab-rapido">
     <div class="card quick-card">
@@ -184,6 +236,12 @@
   </button>
   <button class="nav-item" data-tab="rapido">
     <span class="nav-icon">⚡</span><span>Rápido</span>
+  </button>
+  <button class="nav-item" data-tab="relatorio">
+    <span class="nav-icon">📊</span><span>Gastos</span>
+  </button>
+  <button class="nav-item" data-tab="negocio">
+    <span class="nav-icon">🚀</span><span>Negócio</span>
   </button>
   <button class="nav-item" data-tab="lembretes">
     <span class="nav-icon">✅</span><span>Lembretes</span>

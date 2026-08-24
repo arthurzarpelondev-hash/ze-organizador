@@ -289,6 +289,53 @@ body {
 .note-text { font-size: 14px; white-space: pre-wrap; }
 .note-actions { display: flex; gap: 8px; margin-top: 4px; }
 
+/* Relatório de gastos */
+.report-month-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.month-nav {
+  background: var(--bg-card-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  width: 36px; height: 36px;
+  border-radius: 10px;
+  font-size: 18px;
+}
+.month-nav:disabled {
+  opacity: 0.35;
+}
+.report-month-label {
+  font-weight: 700;
+  font-size: 15px;
+}
+.report-total-card { margin: 0 0 20px; }
+.report-row-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.report-bar-track {
+  background: var(--bg-card-2);
+  border-radius: 8px;
+  height: 8px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+.report-bar-fill {
+  background: var(--teal);
+  height: 100%;
+}
+.report-row-pct {
+  font-size: 11px;
+  color: var(--muted);
+}
+
 .link-btn {
   background: none; border: none; color: var(--teal); font-size: 12px; font-weight: 600; padding: 2px 0;
 }
@@ -343,12 +390,15 @@ body {
   backdrop-filter: blur(10px);
   border-top: 1px solid var(--border);
   display: flex;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   padding: 8px 6px calc(8px + env(safe-area-inset-bottom));
   z-index: 20;
 }
 
 .nav-item {
-  flex: 1;
+  flex: 0 0 auto;
+  min-width: 60px;
   background: none;
   border: none;
   color: var(--muted);
@@ -357,7 +407,7 @@ body {
   align-items: center;
   gap: 3px;
   font-size: 11px;
-  padding: 4px 0;
+  padding: 4px 6px;
 }
 .nav-item.active { color: var(--teal); }
 .nav-icon { font-size: 20px; }

@@ -12,8 +12,10 @@ const CATEGORIES = {
   ],
   expense: [
     { id: 'alimentacao', label: 'Alimentação', icon: '🍔' },
+    { id: 'delivery', label: 'Delivery', icon: '🛵' },
     { id: 'transporte', label: 'Transporte', icon: '🚗' },
     { id: 'moradia', label: 'Moradia', icon: '🏠' },
+    { id: 'contas', label: 'Contas/Boletos', icon: '🧾' },
     { id: 'lazer', label: 'Lazer', icon: '🎮' },
     { id: 'saude', label: 'Saúde', icon: '💊' },
     { id: 'educacao', label: 'Educação', icon: '📚' },
@@ -22,12 +24,30 @@ const CATEGORIES = {
   ],
 };
 
+const BIZ_CATEGORIES = {
+  income: [
+    { id: 'venda', label: 'Venda', icon: '🛍️' },
+    { id: 'servico', label: 'Serviço prestado', icon: '🧰' },
+    { id: 'outros_biz_receita', label: 'Outros', icon: '➕' },
+  ],
+  expense: [
+    { id: 'fornecedor', label: 'Fornecedor/Insumos', icon: '📦' },
+    { id: 'marketing', label: 'Marketing', icon: '📣' },
+    { id: 'ferramentas', label: 'Ferramentas/Software', icon: '🛠️' },
+    { id: 'frete', label: 'Frete/Entrega', icon: '🚚' },
+    { id: 'taxas', label: 'Taxas e impostos', icon: '💸' },
+    { id: 'outros_biz_despesa', label: 'Outros', icon: '📦' },
+  ],
+};
+
+const BIZ_STATUS_LABELS = { planejando: 'Planejando', andamento: 'Em andamento', concluido: 'Concluído' };
+
 function loadData() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) return JSON.parse(raw);
   } catch (e) { console.warn('Falha ao ler dados salvos', e); }
-  return { transactions: [], subscriptions: [], goals: [], tasks: [], notes: [] };
+  return { transactions: [], subscriptions: [], goals: [], tasks: [], notes: [], bizTransactions: [], bizGoals: [] };
 }
 
 function saveData() {
@@ -35,7 +55,7 @@ function saveData() {
 }
 
 const state = loadData();
-for (const key of ['transactions', 'subscriptions', 'goals', 'tasks', 'notes', 'incomes']) {
+for (const key of ['transactions', 'subscriptions', 'goals', 'tasks', 'notes', 'incomes', 'bizTransactions', 'bizGoals']) {
   if (!Array.isArray(state[key])) state[key] = [];
 }
 
@@ -64,10 +84,18 @@ function categoryInfo(type, id) {
   return list.find(c => c.id === id) || { icon: '💰', label: 'Outros' };
 }
 
+function bizCategoryInfo(type, id) {
+  const list = BIZ_CATEGORIES[type] || [];
+  return list.find(c => c.id === id) || { icon: '💰', label: 'Outros' };
+}
+
 /* ---------- NAVIGATION ---------- */
 
-const TAB_TITLES = { financas: 'Finanças', rapido: 'Rápido', lembretes: 'Lembretes', diario: 'Diário', ajustes: 'Ajustes' };
-const NO_FAB_TABS = ['ajustes', 'rapido'];
+const TAB_TITLES = {
+  financas: 'Finanças', rapido: 'Rápido', relatorio: 'Gastos por categoria', negocio: 'Negócio',
+  lembretes: 'Lembretes', diario: 'Diário', ajustes: 'Ajustes',
+};
+const NO_FAB_TABS = ['ajustes', 'rapido', 'relatorio'];
 let currentTab = 'financas';
 
 function switchTab(tab) {
@@ -127,6 +155,7 @@ function renderFinancas() {
   renderIncomes();
   renderSubscriptions();
   renderTransactions();
+  renderReport();
 }
 
 function renderGoals() {
@@ -426,6 +455,245 @@ function openSubscriptionModal() {
   });
 }
 
+/* ---------- RELATÓRIO: GASTOS POR CATEGORIA ---------- */
+
+let reportMonthOffset = 0;
+
+function reportMonthDate() {
+  const d = new Date();
+  d.setDate(1);
+  d.setMonth(d.getMonth() + reportMonthOffset);
+  return d;
+}
+
+function reportMonthKey() {
+  const d = reportMonthDate();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function renderReport() {
+  const key = reportMonthKey();
+  const label = reportMonthDate().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+  document.getElementById('report-month-label').textContent = label.charAt(0).toUpperCase() + label.slice(1);
+  document.getElementById('report-next').disabled = reportMonthOffset >= 0;
+
+  const monthTx = state.transactions.filter(t => t.type === 'expense' && monthKey(t.date) === key);
+  const total = monthTx.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+  document.getElementById('report-total').textContent = brl(total);
+
+  const byCategory = {};
+  for (const t of monthTx) {
+    byCategory[t.category] = (byCategory[t.category] || 0) + (Number(t.amount) || 0);
+  }
+  const rows = Object.entries(byCategory).sort((a, b) => b[1] - a[1]);
+  const el = document.getElementById('report-categories');
+  if (!rows.length) {
+    el.innerHTML = '<div class="empty-hint">Nenhum gasto registrado nesse mês.</div>';
+    return;
+  }
+  const max = rows[0][1];
+  el.innerHTML = rows.map(([catId, value]) => {
+    const cat = categoryInfo('expense', catId);
+    const pct = total > 0 ? Math.round((value / total) * 100) : 0;
+    const barPct = max > 0 ? Math.round((value / max) * 100) : 0;
+    return `
+    <div class="card report-row">
+      <div class="report-row-top">
+        <span>${cat.icon} ${cat.label}</span>
+        <span>${brl(value)}</span>
+      </div>
+      <div class="report-bar-track"><div class="report-bar-fill" style="width:${barPct}%"></div></div>
+      <div class="report-row-pct">${pct}% do total do mês</div>
+    </div>`;
+  }).join('');
+}
+
+document.getElementById('report-prev').addEventListener('click', () => { reportMonthOffset--; renderReport(); });
+document.getElementById('report-next').addEventListener('click', () => {
+  if (reportMonthOffset < 0) { reportMonthOffset++; renderReport(); }
+});
+
+/* ---------- NEGÓCIO ---------- */
+
+function renderNegocio() {
+  const nowMonth = todayISO().slice(0, 7);
+  let saldo = 0, receitasMes = 0, despesasMes = 0;
+
+  for (const tx of state.bizTransactions) {
+    const val = Number(tx.amount) || 0;
+    if (tx.type === 'income') saldo += val; else saldo -= val;
+    if (monthKey(tx.date) === nowMonth) {
+      if (tx.type === 'income') receitasMes += val; else despesasMes += val;
+    }
+  }
+
+  document.getElementById('biz-saldo-total').textContent = brl(saldo);
+  document.getElementById('biz-receitas-mes').textContent = brl(receitasMes);
+  document.getElementById('biz-despesas-mes').textContent = brl(despesasMes);
+
+  renderBizGoals();
+  renderBizTransactions();
+}
+
+function renderBizGoals() {
+  const el = document.getElementById('biz-goals-list');
+  if (!state.bizGoals.length) {
+    el.innerHTML = '<div class="empty-hint">Nenhuma meta ou projeto ainda. Toque em "+ Nova" pra criar.</div>';
+    return;
+  }
+  el.innerHTML = state.bizGoals.map(g => {
+    const hasTarget = (g.target || 0) > 0;
+    const pct = hasTarget ? Math.min(100, Math.round((g.saved / g.target) * 100)) : 0;
+    return `
+    <div class="card goal-card">
+      <div class="goal-top">
+        <span class="goal-name">${escapeHTML(g.name)}</span>
+        <span class="goal-amounts">${hasTarget ? `${brl(g.saved)} / ${brl(g.target)}` : (BIZ_STATUS_LABELS[g.status] || 'Planejando')}</span>
+      </div>
+      ${hasTarget ? `<div class="goal-progress-track"><div class="goal-progress-fill" style="width:${pct}%"></div></div>` : ''}
+      <div class="goal-actions">
+        ${hasTarget ? `<button class="link-btn" data-action="biz-goal-add" data-id="${g.id}">+ Adicionar valor</button>` : ''}
+        <button class="link-btn danger" data-action="biz-goal-del" data-id="${g.id}">Excluir</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderBizTransactions() {
+  const el = document.getElementById('biz-tx-list');
+  const list = [...state.bizTransactions].sort((a, b) => (b.date || '').localeCompare(a.date || '') || b.createdAt - a.createdAt);
+  if (!list.length) {
+    el.innerHTML = '<div class="empty-hint">Nenhum lançamento do negócio ainda. Toque no botão + pra registrar.</div>';
+    return;
+  }
+  el.innerHTML = list.slice(0, 100).map(tx => {
+    const cat = bizCategoryInfo(tx.type, tx.category);
+    const sign = tx.type === 'income' ? '+' : '-';
+    return `
+    <div class="card tx-row">
+      <div class="tx-icon">${cat.icon}</div>
+      <div class="tx-info">
+        <div class="tx-desc">${escapeHTML(tx.desc || cat.label)}</div>
+        <div class="tx-meta">${cat.label} · ${formatDateBR(tx.date)}</div>
+      </div>
+      <div class="tx-amount ${tx.type}">${sign} ${brl(tx.amount)}</div>
+      <button class="tx-del" data-action="biz-tx-del" data-id="${tx.id}">🗑</button>
+    </div>`;
+  }).join('');
+}
+
+function bizCategoryOptions(type) {
+  return BIZ_CATEGORIES[type].map(c => `<option value="${c.id}">${c.icon} ${c.label}</option>`).join('');
+}
+
+function openBizTransactionModal() {
+  let type = 'expense';
+  openModal('Novo lançamento do negócio', `
+    <div class="field">
+      <div class="segmented" id="biz-tx-type-seg">
+        <button type="button" data-type="expense" class="active expense">Despesa</button>
+        <button type="button" data-type="income" class="income">Receita</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>Descrição</label>
+      <input type="text" id="biz-tx-desc" placeholder="Ex: Venda pro cliente X, Compra de material..." />
+    </div>
+    <div class="field">
+      <label>Valor (R$)</label>
+      <input type="number" id="biz-tx-amount" inputmode="decimal" step="0.01" min="0" placeholder="0,00" />
+    </div>
+    <div class="field">
+      <label>Categoria</label>
+      <select id="biz-tx-category">${bizCategoryOptions('expense')}</select>
+    </div>
+    <div class="field">
+      <label>Data</label>
+      <input type="date" id="biz-tx-date" value="${todayISO()}" />
+    </div>
+    <button class="btn-submit" id="biz-tx-submit">Salvar</button>
+  `);
+
+  const seg = document.getElementById('biz-tx-type-seg');
+  seg.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      type = btn.dataset.type;
+      seg.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('biz-tx-category').innerHTML = bizCategoryOptions(type);
+    });
+  });
+
+  document.getElementById('biz-tx-submit').addEventListener('click', () => {
+    const desc = document.getElementById('biz-tx-desc').value.trim();
+    const amount = parseFloat(document.getElementById('biz-tx-amount').value);
+    const category = document.getElementById('biz-tx-category').value;
+    const date = document.getElementById('biz-tx-date').value || todayISO();
+    if (!amount || amount <= 0) { alert('Informe um valor válido.'); return; }
+    state.bizTransactions.push({ id: uid(), type, desc, amount, category, date, createdAt: Date.now() });
+    saveData();
+    renderNegocio();
+    closeModal();
+  });
+}
+
+function openBizGoalModal() {
+  openModal('Nova meta ou projeto', `
+    <div class="field">
+      <label>Nome</label>
+      <input type="text" id="biz-goal-name" placeholder="Ex: Comprar equipamento, Lançar novo produto..." />
+    </div>
+    <div class="field">
+      <label>Valor objetivo (R$) — deixe em branco se não for financeiro</label>
+      <input type="number" id="biz-goal-target" inputmode="decimal" step="0.01" min="0" placeholder="0,00" />
+    </div>
+    <div class="field">
+      <label>Já investido / guardado (R$)</label>
+      <input type="number" id="biz-goal-saved" inputmode="decimal" step="0.01" min="0" value="0" />
+    </div>
+    <div class="field">
+      <label>Status</label>
+      <select id="biz-goal-status">
+        <option value="planejando">Planejando</option>
+        <option value="andamento">Em andamento</option>
+        <option value="concluido">Concluído</option>
+      </select>
+    </div>
+    <button class="btn-submit" id="biz-goal-submit">Salvar</button>
+  `);
+  document.getElementById('biz-goal-submit').addEventListener('click', () => {
+    const name = document.getElementById('biz-goal-name').value.trim();
+    const target = parseFloat(document.getElementById('biz-goal-target').value) || 0;
+    const saved = parseFloat(document.getElementById('biz-goal-saved').value) || 0;
+    const status = document.getElementById('biz-goal-status').value;
+    if (!name) { alert('Digite um nome para a meta ou projeto.'); return; }
+    state.bizGoals.push({ id: uid(), name, target, saved, status });
+    saveData();
+    renderBizGoals();
+    closeModal();
+  });
+}
+
+function openBizGoalAddModal(goalId) {
+  const goal = state.bizGoals.find(g => g.id === goalId);
+  if (!goal) return;
+  openModal(`Adicionar valor - ${goal.name}`, `
+    <div class="field">
+      <label>Valor a adicionar (R$)</label>
+      <input type="number" id="biz-goal-add-amount" inputmode="decimal" step="0.01" min="0" placeholder="0,00" />
+    </div>
+    <button class="btn-submit" id="biz-goal-add-submit">Adicionar</button>
+  `);
+  document.getElementById('biz-goal-add-submit').addEventListener('click', () => {
+    const amount = parseFloat(document.getElementById('biz-goal-add-amount').value);
+    if (!amount || amount <= 0) { alert('Informe um valor válido.'); return; }
+    goal.saved = (goal.saved || 0) + amount;
+    saveData();
+    renderBizGoals();
+    closeModal();
+  });
+}
+
 /* ---------- RENDER: LEMBRETES ---------- */
 
 function renderTasks() {
@@ -530,9 +798,11 @@ const QUICK_EXPENSE_VERBS = ['gastei', 'paguei', 'comprei', 'gasto'];
 const QUICK_INCOME_VERBS = ['recebi', 'ganhei', 'caiu', 'entrou'];
 
 const CATEGORY_KEYWORDS = {
-  alimentacao: ['mercado', 'supermercado', 'feira', 'restaurante', 'lanche', 'ifood', 'comida', 'padaria', 'acougue'],
+  alimentacao: ['mercado', 'supermercado', 'feira', 'restaurante', 'lanche', 'comida', 'padaria', 'acougue'],
+  delivery: ['ifood', 'delivery', 'rappi', 'entrega'],
   transporte: ['uber', '99', 'gasolina', 'combustivel', 'onibus', 'metro', 'estacionamento', 'pedagio'],
-  moradia: ['aluguel', 'condominio', 'luz', 'agua', 'internet', 'gas'],
+  moradia: ['aluguel', 'condominio'],
+  contas: ['luz', 'agua', 'internet', 'gas', 'boleto', 'fatura', 'conta'],
   lazer: ['cinema', 'bar', 'festa', 'show', 'viagem', 'passeio', 'jogo'],
   saude: ['farmacia', 'remedio', 'medico', 'consulta', 'dentista'],
   educacao: ['curso', 'livro', 'faculdade', 'escola', 'mensalidade'],
@@ -820,6 +1090,18 @@ document.addEventListener('click', (e) => {
         saveData(); renderNotes();
       }
       break;
+    case 'new-biz-goal': openBizGoalModal(); break;
+    case 'biz-goal-add': openBizGoalAddModal(id); break;
+    case 'biz-goal-del':
+      if (confirm('Excluir esta meta ou projeto?')) {
+        state.bizGoals = state.bizGoals.filter(g => g.id !== id);
+        saveData(); renderBizGoals();
+      }
+      break;
+    case 'biz-tx-del':
+      state.bizTransactions = state.bizTransactions.filter(t => t.id !== id);
+      saveData(); renderNegocio();
+      break;
   }
 });
 
@@ -827,6 +1109,7 @@ document.getElementById('fab-add').addEventListener('click', () => {
   if (currentTab === 'financas') openTransactionModal();
   else if (currentTab === 'lembretes') openTaskModal();
   else if (currentTab === 'diario') openNoteModal();
+  else if (currentTab === 'negocio') openBizTransactionModal();
 });
 
 /* ---------- AJUSTES: BACKUP ---------- */
@@ -849,7 +1132,7 @@ document.getElementById('import-file').addEventListener('change', (e) => {
     try {
       const data = JSON.parse(reader.result);
       if (!confirm('Importar este backup vai substituir todos os dados atuais. Continuar?')) return;
-      for (const key of ['transactions', 'subscriptions', 'goals', 'tasks', 'notes', 'incomes']) {
+      for (const key of ['transactions', 'subscriptions', 'goals', 'tasks', 'notes', 'incomes', 'bizTransactions', 'bizGoals']) {
         state[key] = Array.isArray(data[key]) ? data[key] : [];
       }
       saveData();
@@ -1032,6 +1315,7 @@ if (isIOSDevice() && !isStandaloneApp() && !localStorage.getItem(INSTALL_DISMISS
 
 function renderAll() {
   renderFinancas();
+  renderNegocio();
   renderTasks();
   renderNotes();
   renderQuickRecent();
