@@ -481,6 +481,7 @@ function openTaskModal() {
     state.tasks.push({ id: uid(), title, datetime: `${date}T${time}`, done: false });
     saveData();
     renderTasks();
+    syncReminders();
     closeModal();
   });
 }
@@ -806,12 +807,12 @@ document.addEventListener('click', (e) => {
       break;
     case 'task-toggle': {
       const task = state.tasks.find(t => t.id === id);
-      if (task) { task.done = !task.done; saveData(); renderTasks(); }
+      if (task) { task.done = !task.done; saveData(); renderTasks(); syncReminders(); }
       break;
     }
     case 'task-del':
       state.tasks = state.tasks.filter(t => t.id !== id);
-      saveData(); renderTasks();
+      saveData(); renderTasks(); syncReminders();
       break;
     case 'note-del':
       if (confirm('Excluir esta nota?')) {
@@ -871,6 +872,100 @@ document.getElementById('btn-clear').addEventListener('click', () => {
   }
 });
 
+/* ---------- AJUSTES: NOTIFICAÇÕES PUSH ---------- */
+
+const VAPID_PUBLIC_KEY = 'BOT9UN52kNVeOs2DwTEdZQTYRydt8k5W7MUgBLddtiD3sIHhUYET9sKoONTzQbUZwBOxUTbW6YP92nwJ43vrKnI';
+const NOTIF_CONFIG_KEY = 'ze_notif_config_v1';
+
+function loadNotifConfig() {
+  try {
+    const raw = localStorage.getItem(NOTIF_CONFIG_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) { console.warn('Falha ao ler config de notificações', e); }
+  return { workerUrl: '', secret: '' };
+}
+
+function saveNotifConfig(cfg) {
+  localStorage.setItem(NOTIF_CONFIG_KEY, JSON.stringify(cfg));
+}
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; i++) outputArray[i] = rawData.charCodeAt(i);
+  return outputArray;
+}
+
+function setNotifStatus(msg) {
+  const el = document.getElementById('notif-status');
+  if (el) el.textContent = msg;
+}
+
+async function syncReminders() {
+  const cfg = loadNotifConfig();
+  if (!cfg.workerUrl || !cfg.secret) return;
+  const reminders = state.tasks
+    .filter(t => !t.done && t.datetime)
+    .map(t => ({ id: t.id, title: t.title, datetimeUTC: new Date(t.datetime).toISOString() }));
+  try {
+    await fetch(`${cfg.workerUrl}/reminders`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Ze-Secret': cfg.secret },
+      body: JSON.stringify({ reminders }),
+    });
+  } catch (err) {
+    console.warn('Falha ao sincronizar lembretes com o servidor de notificações', err);
+  }
+}
+
+async function enableNotifications() {
+  const cfg = loadNotifConfig();
+  if (!cfg.workerUrl || !cfg.secret) {
+    setNotifStatus('Preencha e salve o endereço do servidor e a chave secreta antes.');
+    return;
+  }
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    setNotifStatus('Esse navegador não suporta notificações push.');
+    return;
+  }
+  try {
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') {
+      setNotifStatus('Permissão negada. Ative nas configurações de notificação do navegador/celular.');
+      return;
+    }
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+      });
+    }
+    await fetch(`${cfg.workerUrl}/subscribe`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Ze-Secret': cfg.secret },
+      body: JSON.stringify(sub),
+    });
+    setNotifStatus('Notificações ativadas! ✅');
+    syncReminders();
+  } catch (err) {
+    console.error(err);
+    setNotifStatus('Erro ao ativar notificações: ' + err.message);
+  }
+}
+
+document.getElementById('btn-save-notif-config').addEventListener('click', () => {
+  const workerUrl = document.getElementById('notif-worker-url').value.trim().replace(/\/+$/, '');
+  const secret = document.getElementById('notif-secret').value.trim();
+  saveNotifConfig({ workerUrl, secret });
+  setNotifStatus('Configuração salva.');
+});
+
+document.getElementById('btn-enable-notif').addEventListener('click', enableNotifications);
+
 /* ---------- INIT ---------- */
 
 function renderAll() {
@@ -883,6 +978,10 @@ function renderAll() {
 autoLaunchIncomes();
 renderAll();
 switchTab('financas');
+
+const savedNotifConfig = loadNotifConfig();
+document.getElementById('notif-worker-url').value = savedNotifConfig.workerUrl || '';
+document.getElementById('notif-secret').value = savedNotifConfig.secret || '';
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

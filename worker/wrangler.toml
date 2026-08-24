@@ -1,0 +1,15 @@
+name = "ze-push"
+main = "src/index.js"
+compatibility_date = "2026-08-21"
+
+[triggers]
+crons = ["*/1 * * * *"]
+
+[[kv_namespaces]]
+binding = "ZE_KV"
+id = "512ccfe1ff0f44b984910315c1c1879e"
+
+[vars]
+ALLOWED_ORIGIN = "https://arthurzarpelondev-hash.github.io"
+VAPID_SUBJECT = "mailto:arthurzarpelon.anglopoa@gmail.com"
+VAPID_PUBLIC_KEY = "BOT9UN52kNVeOs2DwTEdZQTYRydt8k5W7MUgBLddtiD3sIHhUYET9sKoONTzQbUZwBOxUTbW6YP92nwJ43vrKnI"

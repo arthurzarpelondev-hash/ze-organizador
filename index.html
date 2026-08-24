@@ -131,13 +131,30 @@
     <div class="section">
       <div class="card settings-card">
         <h2>Seus dados</h2>
-        <p class="muted">Tudo é salvo só neste navegador/celular. Nada é enviado para nenhum servidor.</p>
+        <p class="muted">Tudo é salvo só neste navegador/celular. Nada é enviado para nenhum servidor — exceto os lembretes pendentes, se você ativar as notificações abaixo.</p>
         <div class="settings-actions">
           <button class="btn-secondary" id="btn-export">Exportar backup (.json)</button>
           <label class="btn-secondary" for="import-file">Importar backup</label>
           <input type="file" id="import-file" accept="application/json" hidden />
           <button class="btn-danger" id="btn-clear">Apagar todos os dados</button>
         </div>
+      </div>
+      <div class="card settings-card">
+        <h2>Notificações</h2>
+        <p class="muted">Receba um aviso no celular na hora exata de cada lembrete, mesmo com o app fechado. Preencha os dados do servidor (Cloudflare Worker) uma vez e ative neste celular.</p>
+        <div class="field">
+          <label for="notif-worker-url">Endereço do servidor</label>
+          <input type="text" id="notif-worker-url" placeholder="https://ze-push.seu-usuario.workers.dev" />
+        </div>
+        <div class="field">
+          <label for="notif-secret">Chave secreta</label>
+          <input type="password" id="notif-secret" placeholder="Senha configurada no servidor" />
+        </div>
+        <div class="settings-actions">
+          <button class="btn-secondary" id="btn-save-notif-config">Salvar configuração</button>
+          <button class="btn-secondary" id="btn-enable-notif">🔔 Ativar notificações neste celular</button>
+        </div>
+        <p class="muted" id="notif-status"></p>
       </div>
       <div class="card settings-card">
         <h2>Sobre</h2>
