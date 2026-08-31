@@ -42,14 +42,6 @@ async function handleReminders(request, env) {
   return json({ ok: true, count: reminders.length }, env);
 }
 
-function greetingBR(now) {
-  // Brasil (UTC-3, sem horário de verão desde 2019)
-  const brHour = (now.getUTCHours() - 3 + 24) % 24;
-  if (brHour < 12) return 'Bom dia';
-  if (brHour < 18) return 'Boa tarde';
-  return 'Boa noite';
-}
-
 async function sendPush(env, subscription, payload) {
   const vapid = {
     subject: env.VAPID_SUBJECT,
@@ -83,7 +75,7 @@ async function checkAndNotify(env) {
     if (isNaN(due) || due > now) continue;
 
     try {
-      const body = `${greetingBR(new Date())} Arthur, está na hora de ${r.title}`;
+      const body = `Está na hora de ${r.title}`;
       await sendPush(env, subscription, { title: 'Zé', body, id: r.id });
       sent++;
     } catch (err) {
